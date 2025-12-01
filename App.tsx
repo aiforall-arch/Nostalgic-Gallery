@@ -1,53 +1,42 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ViewState, User } from './types';
 import { LandingPage } from './components/LandingPage';
 import { LoginPage } from './components/LoginPage';
 import { Gallery } from './components/Gallery';
 import { FilmGrain } from './components/FilmGrain';
 import AdminDashboard from './components/AdminDashboard';
-import { supabase } from './supabaseClient';
+const ADMIN_EMAIL = 'jafferbasha240@gmail.com';
 
 const App: React.FC = () => {
-  const [view, setView] = useState<ViewState>(ViewState.LANDING);
+const [view, setView] = useState<ViewState>(ViewState.LANDING);
   const [user, setUser] = useState<User>({ isAuthenticated: false });
   const [isAdmin, setIsAdmin] = useState(false);
 
   const handleLoginSuccess = (identifier: string) => {
+    const email = identifier.includes('@') ? identifier : undefined;
+    const phone = identifier.includes('@') ? undefined : identifier;
+
     setUser({
       isAuthenticated: true,
-      email: identifier.includes('@') ? identifier : undefined,
-      phone: identifier.includes('@') ? undefined : identifier,
+      email,
+      phone,
     });
+
+    // ✅ Simple admin check: if you logged in with your admin email
+    if (email === ADMIN_EMAIL) {
+      setIsAdmin(true);
+    } else {
+      setIsAdmin(false);
+    }
+
     setView(ViewState.GALLERY);
   };
 
-  useEffect(() => {
-    const checkAdmin = async () => {
-      if (!user.isAuthenticated) {
-        setIsAdmin(false);
-        return;
-      }
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        setIsAdmin(false);
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', session.user.id)
-        .single();
-
-      setIsAdmin(profile?.is_admin === true);
-    };
-
-    checkAdmin();
-  }, [user.isAuthenticated]);
+  const handleLogout = () => {
+    setUser({ isAuthenticated: false });
+    setIsAdmin(false);
+    setView(ViewState.LANDING);
+  };
 
   return (
     <>
@@ -63,7 +52,7 @@ const App: React.FC = () => {
 
       {view === ViewState.GALLERY && (
         <>
-          <Gallery user={user} />
+          <Gallery user={user} onLogout={handleLogout} />
 
           {isAdmin && (
             <div
@@ -87,5 +76,36 @@ const App: React.FC = () => {
     </>
   );
 };
+Note: if your Gallery component doesn’t accept onLogout, just remove onLogout={handleLogout} and keep Gallery user={user} exactly as it was.
 
-export default App;
+Scroll down → Commit changes…
+
+2️⃣ Make sure AdminDashboard.tsx exists
+You already showed import AdminDashboard from './components/AdminDashboard'; ✅
+
+Just confirm you have components/AdminDashboard.tsx with at least this content:
+
+tsx
+Copy code
+import React from 'react';
+
+interface AdminDashboardProps {
+  onBack: () => void;
+}
+
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
+  return (
+    <div style={{ padding: '1rem' }}>
+      <button onClick={onBack} style={{ marginBottom: '1rem' }}>
+        ← Back to gallery
+      </button>
+      <h2>Admin Dashboard</h2>
+      <p>
+        This is your admin area. We can later add controls here for deleting
+        media, viewing logs, etc.
+      </p>
+    </div>
+  );
+};
+
+export default AdminDashboard;
