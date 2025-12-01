@@ -5,10 +5,11 @@ import { LoginPage } from './components/LoginPage';
 import { Gallery } from './components/Gallery';
 import { FilmGrain } from './components/FilmGrain';
 import AdminDashboard from './components/AdminDashboard';
+
 const ADMIN_EMAIL = 'jafferbasha240@gmail.com';
 
 const App: React.FC = () => {
-const [view, setView] = useState<ViewState>(ViewState.LANDING);
+  const [view, setView] = useState<ViewState>(ViewState.LANDING);
   const [user, setUser] = useState<User>({ isAuthenticated: false });
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -22,7 +23,6 @@ const [view, setView] = useState<ViewState>(ViewState.LANDING);
       phone,
     });
 
-    // ✅ Simple admin check: if you logged in with your admin email
     if (email === ADMIN_EMAIL) {
       setIsAdmin(true);
     } else {
@@ -43,16 +43,22 @@ const [view, setView] = useState<ViewState>(ViewState.LANDING);
       <FilmGrain />
 
       {view === ViewState.LANDING && (
-        <LandingPage onGetStarted={() => setView(ViewState.LOGIN)} />
+        <LandingPage onEnter={() => setView(ViewState.LOGIN)} />
       )}
 
       {view === ViewState.LOGIN && (
-        <LoginPage onLoginSuccess={handleLoginSuccess} />
+        <LoginPage 
+          onSuccess={handleLoginSuccess}
+          onBack={() => setView(ViewState.LANDING)}
+        />
       )}
 
       {view === ViewState.GALLERY && (
         <>
-          <Gallery user={user} onLogout={handleLogout} />
+          <Gallery 
+            userName={user.email || user.phone || 'Guest'} 
+            onLogout={handleLogout} 
+          />
 
           {isAdmin && (
             <div
@@ -60,9 +66,13 @@ const [view, setView] = useState<ViewState>(ViewState.LANDING);
                 position: 'fixed',
                 bottom: 16,
                 right: 16,
+                zIndex: 30,
               }}
             >
-              <button onClick={() => setView(ViewState.ADMIN)}>
+              <button 
+                onClick={() => setView(ViewState.ADMIN)}
+                className="rounded bg-sienna px-4 py-2 text-sm text-white shadow-lg transition-all hover:bg-sienna/90"
+              >
                 Admin Dashboard
               </button>
             </div>
@@ -76,36 +86,5 @@ const [view, setView] = useState<ViewState>(ViewState.LANDING);
     </>
   );
 };
-Note: if your Gallery component doesn’t accept onLogout, just remove onLogout={handleLogout} and keep Gallery user={user} exactly as it was.
 
-Scroll down → Commit changes…
-
-2️⃣ Make sure AdminDashboard.tsx exists
-You already showed import AdminDashboard from './components/AdminDashboard'; ✅
-
-Just confirm you have components/AdminDashboard.tsx with at least this content:
-
-tsx
-Copy code
-import React from 'react';
-
-interface AdminDashboardProps {
-  onBack: () => void;
-}
-
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
-  return (
-    <div style={{ padding: '1rem' }}>
-      <button onClick={onBack} style={{ marginBottom: '1rem' }}>
-        ← Back to gallery
-      </button>
-      <h2>Admin Dashboard</h2>
-      <p>
-        This is your admin area. We can later add controls here for deleting
-        media, viewing logs, etc.
-      </p>
-    </div>
-  );
-};
-
-export default AdminDashboard;
+export default App;
