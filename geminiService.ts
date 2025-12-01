@@ -1,11 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
 
-const apiKey = process.env.API_KEY || '';
+const apiKey = process.env.GEMINI_API_KEY || '';
 
-// Safely initialize the AI client
 const getAiClient = () => {
   if (!apiKey) {
-    console.warn("API_KEY is not defined.");
+    console.warn("GEMINI_API_KEY is not defined.");
     return null;
   }
   return new GoogleGenAI({ apiKey });
@@ -28,7 +27,7 @@ export const generatePoeticCaption = async (description: string): Promise<string
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.0-flash-exp',
       contents: prompt,
     });
 
