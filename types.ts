@@ -2,6 +2,7 @@ export enum ViewState {
   LANDING = 'LANDING',
   LOGIN = 'LOGIN',
   GALLERY = 'GALLERY',
+  ADMIN = 'ADMIN',
 }
 
 export interface User {
@@ -17,8 +18,8 @@ export interface MediaItem {
   thumbnail: string;
   title: string;
   date: string;
-  description: string; // Used for AI context
-  aspectRatio: string; // Tailwind class
+  description: string;
+  aspectRatio: string;
 }
 
 export interface AuthState {
