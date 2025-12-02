@@ -162,43 +162,54 @@ export const Gallery: React.FC<GalleryProps> = ({ onLogout, userName }) => {
     setUploadState(prev => ({ ...prev, loading: true }));
 
     try {
+      // Detect aspect ratio from the image
+      await new Promise<void>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = uploadState.previewUrl;
+      });
+
       const img = new Image();
       img.src = uploadState.previewUrl;
-      img.onload = async () => {
-        // Simple aspect ratio detection
-        let aspectRatio = 'aspect-square';
-        const ratio = img.width / img.height;
-        if (ratio > 1.25) aspectRatio = 'aspect-[3/2]';
-        else if (ratio < 0.8) aspectRatio = 'aspect-[2/3]';
 
-        const newItem: MediaItem = {
-          id: Date.now().toString(),
-          type: 'image',
-          url: uploadState.previewUrl,
-          thumbnail: uploadState.previewUrl,
-          title: uploadState.title,
-          date: new Date().toISOString(),
-          description: uploadState.description || 'A new memory added to the collection.',
-          aspectRatio,
-          liked: false,
-          uploadedBy: userName,
-        };
+      // Simple aspect ratio detection
+      let aspectRatio = 'aspect-square';
+      const ratio = img.width / img.height;
+      if (ratio > 1.25) aspectRatio = 'aspect-[3/2]';
+      else if (ratio < 0.8) aspectRatio = 'aspect-[2/3]';
 
-        // Save to Supabase
-        const savedItem = await mediaService.saveMedia(newItem, userName);
-        
-        if (savedItem) {
-          setMediaItems(prev => [savedItem, ...prev]);
-          setUploadState({ title: '', description: '', file: null, previewUrl: '', loading: false });
-          if (fileInputRef.current) fileInputRef.current.value = '';
-          setIsUploadOpen(false);
-        } else {
-          console.error('Failed to save media');
-          setUploadState(prev => ({ ...prev, loading: false }));
-        }
+      const newItem: MediaItem = {
+        id: Date.now().toString(),
+        type: 'image',
+        url: uploadState.previewUrl,
+        thumbnail: uploadState.previewUrl,
+        title: uploadState.title,
+        date: new Date().toISOString(),
+        description: uploadState.description || 'A new memory added to the collection.',
+        aspectRatio,
+        liked: false,
+        uploadedBy: userName,
       };
+
+      // Save to Supabase with retry logic
+      console.log('Saving media to Supabase:', newItem);
+      const savedItem = await mediaService.saveMedia(newItem, userName);
+      
+      if (savedItem) {
+        console.log('Media saved successfully:', savedItem);
+        setMediaItems(prev => [savedItem, ...prev]);
+        setUploadState({ title: '', description: '', file: null, previewUrl: '', loading: false });
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        setIsUploadOpen(false);
+      } else {
+        console.error('Failed to save media to Supabase');
+        alert('Failed to save photo. Please check the console for errors.');
+        setUploadState(prev => ({ ...prev, loading: false }));
+      }
     } catch (error) {
       console.error('Upload error:', error);
+      alert(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setUploadState(prev => ({ ...prev, loading: false }));
     }
   };

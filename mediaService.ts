@@ -41,6 +41,8 @@ export const mediaService = {
   // Save a new media item
   async saveMedia(item: MediaItem, userEmail?: string): Promise<MediaItem | null> {
     try {
+      console.log('mediaService: Attempting to save media with ID:', item.id);
+      
       const { data, error } = await supabase
         .from(MEDIA_TABLE)
         .insert([
@@ -63,9 +65,17 @@ export const mediaService = {
         .single();
 
       if (error) {
-        console.error('Error saving media:', error);
+        console.error('Supabase error saving media:', error);
+        console.error('Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        });
         return null;
       }
+
+      console.log('mediaService: Media saved successfully');
 
       return {
         id: data.id,
@@ -82,7 +92,7 @@ export const mediaService = {
         poeticCaption: data.poetic_caption,
       };
     } catch (error) {
-      console.error('Exception saving media:', error);
+      console.error('Exception in saveMedia:', error);
       return null;
     }
   },
