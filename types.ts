@@ -20,6 +20,10 @@ export interface MediaItem {
   date: string;
   description: string;
   aspectRatio: string;
+  liked?: boolean;
+  poeticCaption?: string;
+  uploadedBy?: string;
+  createdAt?: string;
 }
 
 export interface AuthState {

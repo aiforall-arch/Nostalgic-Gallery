@@ -27,7 +27,7 @@ export const generatePoeticCaption = async (description: string): Promise<string
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.5-flash',
       contents: prompt,
     });
 

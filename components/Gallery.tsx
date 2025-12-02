@@ -3,6 +3,7 @@ import { Search, Heart, LogOut, Download, X, Sparkles, User, Calendar, Plus, Upl
 import { MediaItem } from '../types';
 import { SAMPLE_MEDIA } from '../constants';
 import { generatePoeticCaption } from '../geminiService';
+import { mediaService } from '../mediaService';
 
 interface GalleryProps {
   onLogout: () => void;
@@ -16,6 +17,7 @@ export const Gallery: React.FC<GalleryProps> = ({ onLogout, userName }) => {
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
   const [poeticCaption, setPoeticCaption] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Upload Modal State
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -29,6 +31,35 @@ export const Gallery: React.FC<GalleryProps> = ({ onLogout, userName }) => {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Load media from Supabase on mount
+  useEffect(() => {
+    const loadMedia = async () => {
+      setIsLoading(true);
+      try {
+        const dbMedia = await mediaService.fetchAllMedia();
+        if (dbMedia.length > 0) {
+          setMediaItems(dbMedia);
+        }
+      } catch (error) {
+        console.error('Failed to load media:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadMedia();
+  }, []);
+
+  // Update selected item when media items change
+  useEffect(() => {
+    if (selectedItem) {
+      const updated = mediaItems.find(item => item.id === selectedItem.id);
+      if (updated) {
+        setSelectedItem(updated);
+        setPoeticCaption(updated.poeticCaption || null);
+      }
+    }
+  }, [mediaItems]);
+
   const filteredMedia = mediaItems.filter(item => 
     item.title.toLowerCase().includes(filter.toLowerCase()) || 
     item.description.toLowerCase().includes(filter.toLowerCase())
@@ -41,6 +72,18 @@ export const Gallery: React.FC<GalleryProps> = ({ onLogout, userName }) => {
     try {
       const caption = await generatePoeticCaption(selectedItem.description);
       setPoeticCaption(caption);
+      
+      // Update local state immediately
+      const updatedItems = mediaItems.map(item =>
+        item.id === selectedItem.id
+          ? { ...item, poeticCaption: caption }
+          : item
+      );
+      setMediaItems(updatedItems);
+      setSelectedItem(prev => prev ? { ...prev, poeticCaption: caption } : null);
+      
+      // Save caption to Supabase
+      await mediaService.savePoetricCaption(selectedItem.id, caption);
     } catch (e) {
       console.error(e);
     } finally {
@@ -48,9 +91,50 @@ export const Gallery: React.FC<GalleryProps> = ({ onLogout, userName }) => {
     }
   };
 
+  const handleLikeClick = async () => {
+    if (!selectedItem) return;
+    
+    const newLiked = !selectedItem.liked;
+    
+    // Optimistic update
+    const updatedItems = mediaItems.map(item =>
+      item.id === selectedItem.id
+        ? { ...item, liked: newLiked }
+        : item
+    );
+    setMediaItems(updatedItems);
+    setSelectedItem(prev => prev ? { ...prev, liked: newLiked } : null);
+    
+    // Save to database
+    const success = await mediaService.toggleLike(selectedItem.id, newLiked);
+    if (!success) {
+      // Revert if failed
+      setMediaItems(prev => prev.map(item =>
+        item.id === selectedItem.id
+          ? { ...item, liked: !newLiked }
+          : item
+      ));
+      setSelectedItem(prev => prev ? { ...prev, liked: !newLiked } : null);
+    }
+  };
+
+  const handleDownload = () => {
+    if (!selectedItem) return;
+    
+    const link = document.createElement('a');
+    link.href = selectedItem.url;
+    link.download = `${selectedItem.title}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   useEffect(() => {
     if (!selectedItem) {
       setPoeticCaption(null);
+    } else {
+      // Load existing caption if available
+      setPoeticCaption(selectedItem.poeticCaption || null);
     }
   }, [selectedItem]);
 
@@ -71,17 +155,16 @@ export const Gallery: React.FC<GalleryProps> = ({ onLogout, userName }) => {
   };
 
   // Handle uploading/saving the memory
-  const handleUploadSubmit = (e: React.FormEvent) => {
+  const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!uploadState.previewUrl || !uploadState.title) return;
 
     setUploadState(prev => ({ ...prev, loading: true }));
 
-    // Simulate network delay and determine aspect ratio
-    setTimeout(() => {
+    try {
       const img = new Image();
       img.src = uploadState.previewUrl;
-      img.onload = () => {
+      img.onload = async () => {
         // Simple aspect ratio detection
         let aspectRatio = 'aspect-square';
         const ratio = img.width / img.height;
@@ -97,14 +180,27 @@ export const Gallery: React.FC<GalleryProps> = ({ onLogout, userName }) => {
           date: new Date().toISOString(),
           description: uploadState.description || 'A new memory added to the collection.',
           aspectRatio,
+          liked: false,
+          uploadedBy: userName,
         };
 
-        setMediaItems(prev => [newItem, ...prev]);
-        setUploadState({ title: '', description: '', file: null, previewUrl: '', loading: false });
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        setIsUploadOpen(false);
+        // Save to Supabase
+        const savedItem = await mediaService.saveMedia(newItem, userName);
+        
+        if (savedItem) {
+          setMediaItems(prev => [savedItem, ...prev]);
+          setUploadState({ title: '', description: '', file: null, previewUrl: '', loading: false });
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          setIsUploadOpen(false);
+        } else {
+          console.error('Failed to save media');
+          setUploadState(prev => ({ ...prev, loading: false }));
+        }
       };
-    }, 800);
+    } catch (error) {
+      console.error('Upload error:', error);
+      setUploadState(prev => ({ ...prev, loading: false }));
+    }
   };
 
   const closeUploadModal = () => {
@@ -377,11 +473,21 @@ export const Gallery: React.FC<GalleryProps> = ({ onLogout, userName }) => {
                     </div>
 
                     <div className="flex gap-4 border-t border-warmGray/10 pt-6">
-                        <button className="flex flex-1 items-center justify-center gap-2 rounded border border-warmGray/20 py-3 text-sm font-medium transition-colors hover:bg-warmGray/5">
-                            <Heart size={18} className="text-sienna" />
-                            Like
+                        <button 
+                            onClick={handleLikeClick}
+                            className={`flex flex-1 items-center justify-center gap-2 rounded border py-3 text-sm font-medium transition-colors ${
+                              selectedItem.liked 
+                                ? 'border-sienna bg-sienna/10 text-sienna' 
+                                : 'border-warmGray/20 text-warmGray/60 hover:bg-warmGray/5'
+                            }`}
+                        >
+                            <Heart size={18} className={selectedItem.liked ? 'fill-sienna' : ''} />
+                            {selectedItem.liked ? 'Liked' : 'Like'}
                         </button>
-                        <button className="flex flex-1 items-center justify-center gap-2 rounded bg-warmGray py-3 text-sm font-medium text-white transition-colors hover:bg-warmGray/90">
+                        <button 
+                            onClick={handleDownload}
+                            className="flex flex-1 items-center justify-center gap-2 rounded bg-warmGray py-3 text-sm font-medium text-white transition-colors hover:bg-warmGray/90"
+                        >
                             <Download size={18} />
                             Download
                         </button>

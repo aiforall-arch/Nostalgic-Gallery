@@ -12,6 +12,7 @@ const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(ViewState.LANDING);
   const [user, setUser] = useState<User>({ isAuthenticated: false });
   const [isAdmin, setIsAdmin] = useState(false);
+  const [galleryRefresh, setGalleryRefresh] = useState(0);
 
   const handleLoginSuccess = (identifier: string) => {
     const email = identifier.includes('@') ? identifier : undefined;
@@ -56,6 +57,7 @@ const App: React.FC = () => {
       {view === ViewState.GALLERY && (
         <>
           <Gallery 
+            key={galleryRefresh}
             userName={user.email || user.phone || 'Guest'} 
             onLogout={handleLogout} 
           />
@@ -81,7 +83,10 @@ const App: React.FC = () => {
       )}
 
       {view === ViewState.ADMIN && (
-        <AdminDashboard onBack={() => setView(ViewState.GALLERY)} />
+        <AdminDashboard onBack={() => {
+          setView(ViewState.GALLERY);
+          setGalleryRefresh(prev => prev + 1);
+        }} />
       )}
     </>
   );
